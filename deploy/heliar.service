@@ -1,0 +1,22 @@
+[Unit]
+Description=Heliar - Assistencia Tecnica (TROK Service)
+After=network.target
+
+[Service]
+Type=simple
+User=heliar
+Group=heliar
+WorkingDirectory=/opt/heliar/app/server
+EnvironmentFile=/opt/heliar/app/server/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+
+# Isolamento básico — o serviço só precisa escrever em DATA_DIR
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/heliar/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

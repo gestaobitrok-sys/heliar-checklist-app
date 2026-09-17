@@ -1,0 +1,23 @@
+# Caddyfile — coloque em /etc/caddy/Caddyfile
+# Troque o domínio abaixo pelo domínio real (o mesmo que o deploy.sh usa).
+# O Caddy obtém e renova o certificado HTTPS (Let's Encrypt) sozinho, automaticamente.
+
+garantias.trokservice.com.br {
+	encode gzip
+
+	# limite de tamanho do corpo da requisição (fotos em base64 podem ser grandes)
+	request_body {
+		max_size 40MB
+	}
+
+	reverse_proxy 127.0.0.1:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	log {
+		output file /var/log/caddy/heliar-access.log
+		format json
+	}
+}

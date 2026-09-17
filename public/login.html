@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar — Heliar Assistência Técnica</title>
+<style>
+  :root{
+    --brand:#0F7A3D; --brand-dark:#0A5A2D; --ink:#1C1C1C; --ink-soft:#4A4A4A;
+    --line:#DDD7D0; --paper:#FBFAF8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:#161513;
+    color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;
+  }
+  .box{
+    background:#fff;border-radius:12px;padding:34px 30px;width:100%;max-width:360px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  .mark{
+    width:44px;height:44px;border-radius:50%;border:3px solid var(--brand);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:var(--brand);
+    margin:0 auto 14px;
+  }
+  h1{font-size:16px;text-align:center;margin:0 0 2px;}
+  .sub{font-size:12px;color:var(--ink-soft);text-align:center;margin:0 0 24px;}
+  .field{margin-bottom:14px;}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  input{
+    width:100%;font-size:14px;padding:10px 11px;border:1px solid var(--line);border-radius:7px;
+    font-family:inherit;
+  }
+  input:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:var(--brand);}
+  button{
+    width:100%;background:var(--brand);color:#fff;border:none;border-radius:7px;
+    padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;font-family:inherit;
+  }
+  button:hover{background:var(--brand-dark);}
+  button:disabled{opacity:.6;cursor:default;}
+  .erro{
+    background:#FBEAEA;color:#970C22;border-radius:7px;padding:9px 11px;font-size:12.5px;
+    margin-bottom:14px;display:none;
+  }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="mark">TS</div>
+    <h1>Heliar · Assistência Técnica</h1>
+    <div class="sub">TROK Service</div>
+    <div class="erro" id="erro"></div>
+    <form id="login-form">
+      <div class="field">
+        <label for="login">Login</label>
+        <input id="login" name="login" type="text" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" id="btn">Entrar</button>
+    </form>
+  </div>
+<script>
+  const form = document.getElementById('login-form');
+  const erroBox = document.getElementById('erro');
+  const btn = document.getElementById('btn');
+
+  // se já tiver sessão válida, pula direto pro app
+  fetch('/api/auth/me', { credentials:'include' }).then(r=>{ if(r.ok) window.location.href = '/'; });
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    erroBox.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Entrando…';
+    try{
+      const res = await fetch('/api/auth/login', {
+        method:'POST',
+        credentials:'include',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          login: document.getElementById('login').value.trim(),
+          senha: document.getElementById('senha').value
+        })
+      });
+      const body = await res.json().catch(()=>({}));
+      if(!res.ok){
+        erroBox.textContent = body.error || 'Não foi possível entrar';
+        erroBox.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+        return;
+      }
+      window.location.href = '/';
+    }catch(err){
+      erroBox.textContent = 'Erro de conexão com o servidor';
+      erroBox.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+    }
+  });
+</script>
+</body>
+</html>
