@@ -52,10 +52,15 @@ router.post('/:id/senha', async (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  // nunca apagar de fato — só desativa, pra não perder o rastro de quem criou/editou atendimentos
+  // Exclusão de verdade (não é só desativar). É seguro: os atendimentos guardam o nome/login
+  // de quem criou/editou como texto solto (created_by/updated_by), sem depender da linha do
+  // usuário continuar existindo — apagar o usuário não afeta o histórico de atendimentos.
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'usuário não encontrado' });
-  db.prepare('UPDATE users SET ativo = 0 WHERE id = ?').run(req.params.id);
+  if (req.user && req.user.id === req.params.id) {
+    return res.status(400).json({ error: 'você não pode excluir o seu próprio usuário' });
+  }
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 

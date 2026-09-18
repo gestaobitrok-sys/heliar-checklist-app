@@ -247,7 +247,7 @@
     <nav class="tabs" id="tabnav">
       <button data-tab="novo">Novo Atendimento</button>
       <button data-tab="lista">Atendimentos</button>
-      <button data-tab="unidades">Cadastros</button>
+      <button data-tab="unidades" id="tab-cadastros" style="display:none;">Cadastros</button>
       <button data-tab="usuarios" id="tab-usuarios" style="display:none;">Usuários</button>
     </nav>
     <div id="user-box" style="display:flex;align-items:center;gap:10px;"></div>
@@ -1372,6 +1372,7 @@ async function renderUsuarios(){
         <button class="btn small btn-edit-user">Editar</button>
         <button class="btn small btn-reset-senha">Resetar senha</button>
         <button class="btn small danger btn-toggle-user">${u.ativo?'Desativar':'Ativar'}</button>
+        ${u.id === currentUser.id ? '' : '<button class="btn small danger btn-delete-user">Excluir</button>'}
       </div>
     </div>
   `).join('') || '<div class="empty">Nenhum usuário cadastrado.</div>';
@@ -1451,6 +1452,19 @@ function bindUsuariosEvents(){
         toast('Usuário ' + (ativando?'ativado':'desativado'));
         render();
       }catch(err){ toast('Erro: ' + err.message); }
+    });
+  });
+  document.querySelectorAll('.btn-delete-user').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const card = e.target.closest('.unit-card');
+      const id = card.dataset.id;
+      const nome = card.querySelector('div[style*="font-weight"]').textContent.trim();
+      if(!confirm(`Excluir definitivamente o usuário "${nome}"? Essa ação não pode ser desfeita — o login dele deixa de funcionar imediatamente. (O histórico de atendimentos já registrados não é afetado.)`)) return;
+      try{
+        await api('/users/'+id, { method:'DELETE' });
+        toast('Usuário excluído');
+        render();
+      }catch(err){ toast('Erro ao excluir usuário: ' + err.message); }
     });
   });
 }
@@ -1620,6 +1634,9 @@ function doPrint(html){
   renderUserBox();
   if(currentUser.role === 'admin'){
     document.getElementById('tab-usuarios').style.display = '';
+  }
+  if(currentUser.role !== 'tecnico'){
+    document.getElementById('tab-cadastros').style.display = '';
   }
   try{
     await loadState();
