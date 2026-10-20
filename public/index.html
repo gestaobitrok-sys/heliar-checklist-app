@@ -155,9 +155,12 @@
   .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;}
   .stat .n{font-size:26px;font-weight:800;}
   .stat .l{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .stat .p{font-size:12px;font-weight:700;margin-top:2px;}
   .stat.em_teste .n{color:var(--amber);}
   .stat.procedente .n{color:var(--green);}
   .stat.improcedente .n{color:var(--red-dark);}
+  .stat.procedente .p{color:var(--green);}
+  .stat.improcedente .p{color:var(--red-dark);}
 
   .empty{text-align:center;padding:50px 20px;color:var(--ink-soft);}
   .empty .big{font-size:34px;margin-bottom:8px;}
@@ -869,11 +872,12 @@ function renderStats(list){
   const emTeste = list.filter(a=>((a.laudo&&a.laudo.status)||'em_teste')==='em_teste').length;
   const procedente = list.filter(a=>(a.laudo&&a.laudo.status)==='procedente').length;
   const improcedente = list.filter(a=>(a.laudo&&a.laudo.status)==='improcedente').length;
+  const pct = (n) => total > 0 ? `${((n/total)*100).toFixed(1)}%` : '—';
   return `
     <div class="stat"><div class="n">${total}</div><div class="l">Total no filtro</div></div>
     <div class="stat em_teste"><div class="n">${emTeste}</div><div class="l">Em teste</div></div>
-    <div class="stat procedente"><div class="n">${procedente}</div><div class="l">Procedentes</div></div>
-    <div class="stat improcedente"><div class="n">${improcedente}</div><div class="l">Improcedentes</div></div>
+    <div class="stat procedente"><div class="n">${procedente}</div><div class="l">Procedentes</div><div class="p">${pct(procedente)}</div></div>
+    <div class="stat improcedente"><div class="n">${improcedente}</div><div class="l">Improcedentes</div><div class="p">${pct(improcedente)}</div></div>
   `;
 }
 function renderTabela(list){
