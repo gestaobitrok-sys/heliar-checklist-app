@@ -196,6 +196,25 @@
   .unit-card{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line-soft);}
   .unit-card:last-child{border-bottom:none;}
 
+  /* ---------- Dashboard ---------- */
+  .dash-grid{display:grid;grid-template-columns:minmax(280px,1fr) 2fr;gap:16px;align-items:start;}
+  @media(max-width:860px){.dash-grid{grid-template-columns:1fr;}}
+  .pie-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;}
+  .pie-legend{display:flex;flex-direction:column;gap:8px;font-size:13px;width:100%;max-width:260px;}
+  .pie-legend .li{display:flex;align-items:center;gap:8px;}
+  .pie-legend .sw{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+  .pie-legend .li .v{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;}
+  table.rank{width:100%;border-collapse:collapse;font-size:13px;}
+  table.rank th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);padding:7px 8px;border-bottom:2px solid var(--line);}
+  table.rank td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  table.rank th.num, table.rank td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  table.rank td.pos{color:var(--ink-soft);width:34px;}
+  .rank-bar{height:8px;border-radius:4px;background:var(--line-soft);overflow:hidden;display:flex;min-width:80px;}
+  .rank-bar span{display:block;height:100%;}
+  .rank-bar .bp{background:var(--green);}
+  .rank-bar .bi{background:var(--red-dark);}
+  .rank-bar .bt{background:var(--amber);}
+
   footer.hint-bar{padding:14px 22px;font-size:11.5px;color:var(--ink-soft);text-align:center;}
 
   /* ---------- Print ---------- */
@@ -234,6 +253,19 @@
     .p-decision.em_teste{background:#FBF1E1;color:#B8791A;}
     .p-obs{font-size:10.5px;border:1px solid #ccc;border-radius:4px;padding:6px 8px;min-height:30px;margin-top:4px;}
     .p-legal{font-size:9px;color:#555;margin-top:14px;line-height:1.4;}
+    /* relatório do dashboard */
+    .p-page *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .p-kpis{display:flex;gap:8px;margin-bottom:12px;}
+    .p-kpi{flex:1;border:1px solid #ccc;border-radius:4px;padding:8px 10px;}
+    .p-kpi .n{font-size:18px;font-weight:800;}
+    .p-kpi .l{font-size:9.5px;color:#555;text-transform:uppercase;}
+    .p-dash-top{display:flex;gap:18px;align-items:center;border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin-bottom:10px;break-inside:avoid;}
+    .p-dash-top .pie-legend{font-size:11px;max-width:none;flex:1;}
+    table.p-rank{width:100%;border-collapse:collapse;font-size:10.5px;}
+    table.p-rank th{text-align:left;font-size:9px;text-transform:uppercase;color:#555;border-bottom:1.5px solid #333;padding:4px 6px;}
+    table.p-rank td{border-bottom:1px solid #ddd;padding:4px 6px;}
+    table.p-rank tr{break-inside:avoid;}
+    table.p-rank .num{text-align:right;}
   }
 </style>
 </head>
@@ -250,6 +282,7 @@
     <nav class="tabs" id="tabnav">
       <button data-tab="novo">Novo Atendimento</button>
       <button data-tab="lista">Atendimentos</button>
+      <button data-tab="dashboard" id="tab-dashboard" style="display:none;">Dashboard</button>
       <button data-tab="unidades" id="tab-cadastros" style="display:none;">Cadastros</button>
       <button data-tab="usuarios" id="tab-usuarios" style="display:none;">Usuários</button>
     </nav>
@@ -466,6 +499,9 @@ function render(){
       main.innerHTML = renderLista();
       bindListaEvents();
     }
+  } else if(currentTab === 'dashboard'){
+    main.innerHTML = renderDashboard();
+    bindDashboardEvents();
   } else if(currentTab === 'unidades'){
     main.innerHTML = renderUnidades();
     bindUnidadesEvents();
@@ -974,6 +1010,212 @@ function bindListaEvents(){
       btnExportarGarantia.textContent = textoOriginal;
     });
   }
+}
+
+/* ============================= DASHBOARD ============================= */
+const DASH_COR = { procedente:'#2E7D46', improcedente:'#970C22', em_teste:'#B8791A' };
+let dashFiltro = null; // guarda o período/unidade escolhidos enquanto a página estiver aberta
+
+function dashGetFiltro(){
+  if(!dashFiltro) dashFiltro = { de: startOfMonthISO(), ate: todayISO(), unidade: '' };
+  return dashFiltro;
+}
+function dashLista(f){
+  return state.atendimentos.filter(a=>{
+    if(f.unidade && a.unidade_id !== f.unidade) return false;
+    if(f.de && (!a.data || a.data < f.de)) return false;
+    if(f.ate && (!a.data || a.data > f.ate)) return false;
+    return true;
+  });
+}
+function normSku(v){ return String(v||'').trim().toUpperCase(); }
+function dashCalc(list){
+  const tot = { total:list.length, procedente:0, improcedente:0, em_teste:0 };
+  const porSku = {};
+  list.forEach(a=>{
+    const st = (a.laudo && a.laudo.status) || 'em_teste';
+    tot[st] = (tot[st]||0) + 1;
+    const sku = normSku(a.bateria && a.bateria.cod_sku) || '(sem SKU)';
+    const r = porSku[sku] || (porSku[sku] = { sku, total:0, procedente:0, improcedente:0, em_teste:0 });
+    r.total++; r[st] = (r[st]||0) + 1;
+  });
+  const ranking = Object.values(porSku).sort((x,y)=> y.total - x.total || y.procedente - x.procedente || x.sku.localeCompare(y.sku));
+  return { tot, ranking };
+}
+function pctBR(n, d){ return d ? (n/d*100).toFixed(1).replace('.', ',') + '%' : '—'; }
+function periodoLabel(f){
+  if(f.de && f.ate) return fmtDate(f.de) + ' a ' + fmtDate(f.ate);
+  if(f.de) return 'a partir de ' + fmtDate(f.de);
+  if(f.ate) return 'até ' + fmtDate(f.ate);
+  return 'Todo o período';
+}
+
+/* Pizza em SVG puro (sem biblioteca) — imprime igual à tela */
+function pieSVG(fatias, size){
+  const total = fatias.reduce((s,f)=>s+f.v, 0);
+  const r = size/2, cx = r, cy = r;
+  if(!total){
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r-1}" fill="#EEECE8"/><text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="12" fill="#4A4A4A">Sem dados</text></svg>`;
+  }
+  const nonZero = fatias.filter(f=>f.v>0);
+  let paths = '';
+  if(nonZero.length === 1){
+    paths = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${nonZero[0].cor}"/>`;
+  } else {
+    let ang = -Math.PI/2;
+    nonZero.forEach(f=>{
+      const a2 = ang + f.v/total*Math.PI*2;
+      const x1 = cx + r*Math.cos(ang), y1 = cy + r*Math.sin(ang);
+      const x2 = cx + r*Math.cos(a2),  y2 = cy + r*Math.sin(a2);
+      const large = (a2-ang) > Math.PI ? 1 : 0;
+      paths += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${f.cor}" stroke="#fff" stroke-width="2"/>`;
+      ang = a2;
+    });
+  }
+  // rótulos de % dentro das fatias (só se couber)
+  let labels = '', ang = -Math.PI/2;
+  nonZero.forEach(f=>{
+    const frac = f.v/total, mid = ang + frac*Math.PI;
+    if(frac >= 0.06){
+      const lx = cx + r*0.62*Math.cos(mid), ly = cy + r*0.62*Math.sin(mid);
+      labels += `<text x="${lx.toFixed(1)}" y="${(ly+5).toFixed(1)}" text-anchor="middle" font-size="${Math.round(size/13)}" font-weight="700" fill="#fff">${pctBR(f.v,total)}</text>`;
+    }
+    ang += frac*Math.PI*2;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="Procedentes vs improcedentes">${paths}${labels}</svg>`;
+}
+function pieBlock(tot, size){
+  const decididos = tot.procedente + tot.improcedente;
+  const svg = pieSVG([
+    { v: tot.procedente, cor: DASH_COR.procedente },
+    { v: tot.improcedente, cor: DASH_COR.improcedente }
+  ], size);
+  const legend = `
+    <div class="pie-legend">
+      <div class="li"><span class="sw" style="background:${DASH_COR.procedente}"></span>Procedentes<span class="v">${tot.procedente} · ${pctBR(tot.procedente, decididos)}</span></div>
+      <div class="li"><span class="sw" style="background:${DASH_COR.improcedente}"></span>Improcedentes<span class="v">${tot.improcedente} · ${pctBR(tot.improcedente, decididos)}</span></div>
+      <div class="li muted" style="font-size:11.5px;">${tot.em_teste} em teste (fora da pizza, ainda sem decisão)</div>
+    </div>`;
+  return { svg, legend };
+}
+function rankingRows(ranking, print){
+  const max = ranking.length ? ranking[0].total : 0;
+  return ranking.map((r,i)=>{
+    const w = (n)=> max ? (n/max*100).toFixed(2) : 0;
+    const bar = print ? '' : `<td style="width:28%;"><div class="rank-bar">
+        <span class="bp" style="width:${w(r.procedente)}%"></span><span class="bi" style="width:${w(r.improcedente)}%"></span><span class="bt" style="width:${w(r.em_teste)}%"></span>
+      </div></td>`;
+    return `<tr>
+      <td class="pos">${i+1}º</td>
+      <td class="mono"><b>${esc(r.sku)}</b></td>
+      <td class="num"><b>${r.total}</b></td>
+      <td class="num" style="color:${DASH_COR.procedente}">${r.procedente}</td>
+      <td class="num" style="color:${DASH_COR.improcedente}">${r.improcedente}</td>
+      <td class="num" style="color:${DASH_COR.em_teste}">${r.em_teste}</td>
+      <td class="num">${pctBR(r.procedente, r.procedente + r.improcedente)}</td>
+      ${bar}
+    </tr>`;
+  }).join('');
+}
+function rankingHead(print){
+  return `<tr><th>#</th><th>Cod SKU</th><th class="num">Total</th><th class="num">Proc.</th><th class="num">Improc.</th><th class="num">Em teste</th><th class="num">% proc.</th>${print?'':'<th></th>'}</tr>`;
+}
+
+function renderDashboard(){
+  const f = dashGetFiltro();
+  const unidadeOptions = state.unidades.map(u=>`<option value="${esc(u.id)}" ${u.id===f.unidade?'selected':''}>${esc(u.nome)}</option>`).join('');
+  return `
+    <div class="card no-print">
+      <div class="section-title">Dashboard
+        <button type="button" class="btn small primary" id="btn-dash-print">🖨 Imprimir relatório</button>
+      </div>
+      <div class="filters" style="margin-bottom:8px;">
+        <div class="field"><label>De</label><input id="d-data-de" type="date" value="${esc(f.de)}"></div>
+        <div class="field"><label>Até</label><input id="d-data-ate" type="date" value="${esc(f.ate)}"></div>
+        <div class="field"><label>Unidade</label><select id="d-unidade"><option value="">Todas</option>${unidadeOptions}</select></div>
+      </div>
+      <div class="btn-row" style="margin-top:0;">
+        <button type="button" class="btn small" id="dq-hoje">Hoje</button>
+        <button type="button" class="btn small" id="dq-semana">Esta semana</button>
+        <button type="button" class="btn small" id="dq-mes">Este mês</button>
+        <button type="button" class="btn small" id="dq-limpar">Todo o período</button>
+      </div>
+    </div>
+    <div id="dash-body"></div>
+  `;
+}
+function refreshDashboard(){
+  const f = dashGetFiltro();
+  const { tot, ranking } = dashCalc(dashLista(f));
+  const pie = pieBlock(tot, 200);
+  document.getElementById('dash-body').innerHTML = `
+    <div class="stat-row">${renderStats(dashLista(f))}</div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="section-title">Procedentes vs Improcedentes</div>
+        <div class="pie-wrap">${pie.svg}${pie.legend}</div>
+      </div>
+      <div class="card">
+        <div class="section-title">Ranking de Cod SKU mais tocados <span class="muted" style="font-weight:400;">${ranking.length} SKU${ranking.length===1?'':'s'}</span></div>
+        ${ranking.length ? `<div style="overflow-x:auto;"><table class="rank"><thead>${rankingHead(false)}</thead><tbody>${rankingRows(ranking,false)}</tbody></table></div>
+          <div class="muted" style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;">
+            <span><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${DASH_COR.procedente}"></span> procedente</span>
+            <span><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${DASH_COR.improcedente}"></span> improcedente</span>
+            <span><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${DASH_COR.em_teste}"></span> em teste</span>
+          </div>`
+        : `<div class="empty">Nenhum atendimento no período.</div>`}
+      </div>
+    </div>
+  `;
+}
+function bindDashboardEvents(){
+  const f = dashGetFiltro();
+  const set = (de, ate)=>{
+    f.de = de; f.ate = ate;
+    document.getElementById('d-data-de').value = de;
+    document.getElementById('d-data-ate').value = ate;
+    refreshDashboard();
+  };
+  document.getElementById('d-data-de').addEventListener('change', e=>{ f.de = e.target.value; refreshDashboard(); });
+  document.getElementById('d-data-ate').addEventListener('change', e=>{ f.ate = e.target.value; refreshDashboard(); });
+  document.getElementById('d-unidade').addEventListener('change', e=>{ f.unidade = e.target.value; refreshDashboard(); });
+  document.getElementById('dq-hoje').addEventListener('click', ()=> set(todayISO(), todayISO()));
+  document.getElementById('dq-semana').addEventListener('click', ()=> set(startOfWeekISO(), todayISO()));
+  document.getElementById('dq-mes').addEventListener('click', ()=> set(startOfMonthISO(), todayISO()));
+  document.getElementById('dq-limpar').addEventListener('click', ()=> set('', ''));
+  document.getElementById('btn-dash-print').addEventListener('click', printDashboard);
+  refreshDashboard();
+}
+function printDashboard(){
+  const f = dashGetFiltro();
+  const { tot, ranking } = dashCalc(dashLista(f));
+  const pie = pieBlock(tot, 170);
+  const agora = new Date();
+  const emitido = fmtDate(isoLocal(agora)) + ' ' + String(agora.getHours()).padStart(2,'0') + ':' + String(agora.getMinutes()).padStart(2,'0');
+  const html = `
+  <div class="p-page">
+    <div class="p-head">
+      ${LOGOS_LAUDO_HTML}
+      <div class="doc-meta">
+        <div class="doc-title">Relatório de Atendimentos — Ranking de Cod SKU</div>
+        <div>Período: <b>${esc(periodoLabel(f))}</b></div>
+        <div>Unidade: <b>${esc(f.unidade ? unidadeNome(f.unidade) : 'Todas')}</b></div>
+        <div>Emitido em ${emitido} por ${esc(currentUser && currentUser.nome)}</div>
+      </div>
+    </div>
+    <div class="p-kpis">
+      <div class="p-kpi"><div class="n">${tot.total}</div><div class="l">Total de atendimentos</div></div>
+      <div class="p-kpi"><div class="n" style="color:${DASH_COR.em_teste}">${tot.em_teste}</div><div class="l">Em teste</div></div>
+      <div class="p-kpi"><div class="n" style="color:${DASH_COR.procedente}">${tot.procedente} <span style="font-size:11px">${pctBR(tot.procedente, tot.total)}</span></div><div class="l">Procedentes</div></div>
+      <div class="p-kpi"><div class="n" style="color:${DASH_COR.improcedente}">${tot.improcedente} <span style="font-size:11px">${pctBR(tot.improcedente, tot.total)}</span></div><div class="l">Improcedentes</div></div>
+    </div>
+    <div class="p-section-title">Procedentes vs Improcedentes (atendimentos já decididos)</div>
+    <div class="p-dash-top">${pie.svg}${pie.legend}</div>
+    <div class="p-section-title">Ranking de Cod SKU mais tocados (${ranking.length} SKU${ranking.length===1?'':'s'})</div>
+    ${ranking.length ? `<table class="p-rank"><thead>${rankingHead(true)}</thead><tbody>${rankingRows(ranking,true)}</tbody></table>`
+      : `<div class="p-obs">Nenhum atendimento no período.</div>`}
+  </div>`;
+  doPrint(html);
 }
 
 /* ============================= DETALHE ============================= */
@@ -1644,6 +1886,7 @@ function doPrint(html){
   }
   if(currentUser.role !== 'tecnico'){
     document.getElementById('tab-cadastros').style.display = '';
+    document.getElementById('tab-dashboard').style.display = '';
   }
   try{
     await loadState();
