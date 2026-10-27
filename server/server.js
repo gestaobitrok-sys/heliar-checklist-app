@@ -27,6 +27,7 @@ app.use('/api/users', requireAuth, requireAdmin, require('./routes/users'));
 app.use('/api/backup', requireAuth, requireAdmin, require('./routes/backup'));
 app.use('/api/motivos', requireAuth, require('./routes/motivos'));
 app.use('/api/garantia', requireAuth, requireRole('admin', 'gestor'), require('./routes/garantia'));
+app.use('/api/dashboard', requireAuth, requireRole('admin', 'gestor'), require('./routes/dashboard'));
 
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
