@@ -1137,7 +1137,10 @@ function renderDashboard(){
   return `
     <div class="card no-print">
       <div class="section-title">Dashboard
-        <button type="button" class="btn small primary" id="btn-dash-print">🖨 Imprimir relatório</button>
+        <span class="btn-row" style="margin-top:0;">
+          <button type="button" class="btn small" id="btn-dash-excel">⬇ Exportar Excel</button>
+          <button type="button" class="btn small primary" id="btn-dash-print">🖨 Imprimir relatório</button>
+        </span>
       </div>
       <div class="filters" style="margin-bottom:8px;">
         <div class="field"><label>De</label><input id="d-data-de" type="date" value="${esc(f.de)}"></div>
@@ -1196,7 +1199,66 @@ function bindDashboardEvents(){
   document.getElementById('dq-mes').addEventListener('click', ()=> set(startOfMonthISO(), todayISO()));
   document.getElementById('dq-limpar').addEventListener('click', ()=> set('', ''));
   document.getElementById('btn-dash-print').addEventListener('click', printDashboard);
+  document.getElementById('btn-dash-excel').addEventListener('click', exportDashboardExcel);
   refreshDashboard();
+}
+function motivoTexto(cod){
+  if(!cod) return '';
+  const m = (typeof MOTIVOS !== 'undefined' ? MOTIVOS : []).find(x=>String(x.codigo)===String(cod));
+  return m ? (m.codigo + ' — ' + m.descricao) : String(cod);
+}
+async function exportDashboardExcel(){
+  const btn = document.getElementById('btn-dash-excel');
+  const f = dashGetFiltro();
+  const lista = dashLista(f);
+  const { tot, ranking } = dashCalc(lista);
+  const agora = new Date();
+  const payload = {
+    cabecalho: {
+      periodo: periodoLabel(f),
+      unidade: f.unidade ? unidadeNome(f.unidade) : 'Todas',
+      busca: (f.busca||'').trim(),
+      emitido: fmtDate(isoLocal(agora)) + ' ' + String(agora.getHours()).padStart(2,'0') + ':' + String(agora.getMinutes()).padStart(2,'0'),
+      emitidoPor: currentUser && currentUser.nome
+    },
+    tot, ranking,
+    atendimentos: lista.slice().sort((x,y)=> String(x.data||'').localeCompare(String(y.data||''))).map(a=>({
+      laudo: a.laudo_numero,
+      data: a.data ? fmtDate(a.data) : '',
+      unidade: unidadeNome(a.unidade_id),
+      cliente: a.cliente && a.cliente.nome,
+      placa: a.veiculo && a.veiculo.placa,
+      sku: normSku(a.bateria && a.bateria.cod_sku),
+      fabricacao: a.bateria && a.bateria.cod_fabricacao,
+      status: statusLabel((a.laudo && a.laudo.status) || 'em_teste'),
+      motivo: motivoTexto(a.laudo && a.laudo.motivo)
+    }))
+  };
+  const txt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Gerando…';
+  try{
+    const res = await fetch('/api/dashboard/export', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(res.status === 401){ goToLogin(); return; }
+    if(!res.ok){
+      const body = await res.json().catch(()=>({}));
+      throw new Error(body.error || ('Erro ' + res.status));
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `dashboard-heliar-${isoLocal(agora)}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('Excel do dashboard exportado');
+  }catch(err){
+    console.error('Erro ao exportar Excel do dashboard', err);
+    toast('Erro ao exportar Excel: ' + err.message);
+  }
+  btn.disabled = false; btn.textContent = txt;
 }
 function printDashboard(){
   const f = dashGetFiltro();
