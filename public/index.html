@@ -1085,16 +1085,17 @@ function pieSVG(fatias, size){
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="Procedentes vs improcedentes">${paths}${labels}</svg>`;
 }
 function pieBlock(tot, size){
-  const decididos = tot.procedente + tot.improcedente;
+  // percentuais sobre o TOTAL do filtro — batem com os cartões do topo
   const svg = pieSVG([
     { v: tot.procedente, cor: DASH_COR.procedente },
-    { v: tot.improcedente, cor: DASH_COR.improcedente }
+    { v: tot.improcedente, cor: DASH_COR.improcedente },
+    { v: tot.em_teste, cor: DASH_COR.em_teste }
   ], size);
   const legend = `
     <div class="pie-legend">
-      <div class="li"><span class="sw" style="background:${DASH_COR.procedente}"></span>Procedentes<span class="v">${tot.procedente} · ${pctBR(tot.procedente, decididos)}</span></div>
-      <div class="li"><span class="sw" style="background:${DASH_COR.improcedente}"></span>Improcedentes<span class="v">${tot.improcedente} · ${pctBR(tot.improcedente, decididos)}</span></div>
-      <div class="li muted" style="font-size:11.5px;">${tot.em_teste} em teste (fora da pizza, ainda sem decisão)</div>
+      <div class="li"><span class="sw" style="background:${DASH_COR.procedente}"></span>Procedentes<span class="v">${tot.procedente} · ${pctBR(tot.procedente, tot.total)}</span></div>
+      <div class="li"><span class="sw" style="background:${DASH_COR.improcedente}"></span>Improcedentes<span class="v">${tot.improcedente} · ${pctBR(tot.improcedente, tot.total)}</span></div>
+      <div class="li"><span class="sw" style="background:${DASH_COR.em_teste}"></span>Em teste<span class="v">${tot.em_teste} · ${pctBR(tot.em_teste, tot.total)}</span></div>
     </div>`;
   return { svg, legend };
 }
@@ -1112,7 +1113,7 @@ function rankingRows(ranking, print){
       <td class="num" style="color:${DASH_COR.procedente}">${r.procedente}</td>
       <td class="num" style="color:${DASH_COR.improcedente}">${r.improcedente}</td>
       <td class="num" style="color:${DASH_COR.em_teste}">${r.em_teste}</td>
-      <td class="num">${pctBR(r.procedente, r.procedente + r.improcedente)}</td>
+      <td class="num">${pctBR(r.procedente, r.total)}</td>
       ${bar}
     </tr>`;
   }).join('');
@@ -1209,7 +1210,7 @@ function printDashboard(){
       <div class="p-kpi"><div class="n" style="color:${DASH_COR.procedente}">${tot.procedente} <span style="font-size:11px">${pctBR(tot.procedente, tot.total)}</span></div><div class="l">Procedentes</div></div>
       <div class="p-kpi"><div class="n" style="color:${DASH_COR.improcedente}">${tot.improcedente} <span style="font-size:11px">${pctBR(tot.improcedente, tot.total)}</span></div><div class="l">Improcedentes</div></div>
     </div>
-    <div class="p-section-title">Procedentes vs Improcedentes (atendimentos já decididos)</div>
+    <div class="p-section-title">Procedentes vs Improcedentes</div>
     <div class="p-dash-top">${pie.svg}${pie.legend}</div>
     <div class="p-section-title">Ranking de Cod SKU mais tocados (${ranking.length} SKU${ranking.length===1?'':'s'})</div>
     ${ranking.length ? `<table class="p-rank"><thead>${rankingHead(true)}</thead><tbody>${rankingRows(ranking,true)}</tbody></table>`
